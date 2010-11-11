@@ -33,9 +33,10 @@ Tools for CSS:
 
 PREREQUISITES
 -------------
-NodeJS: http://nodejs.org/
+NodeJS: <http://nodejs.org/>
 
 For Ubuntu use: 
+
 sudo apt-get install nodejs
 
 For other linux distrobutions this may be a click away in your package manager. 
