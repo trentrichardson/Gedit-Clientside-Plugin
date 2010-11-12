@@ -194,7 +194,8 @@ class CSSTidy(object):
 
         #Start Parsing
         i = 0
-        while i < len(cssString):
+        #while i < len(cssString):
+        while i < len(self._css):
             if self._css[i] == "\n" or self._css[i] == "\r":
                 self._line += 1
 

@@ -380,7 +380,6 @@ class ClientsideWindowHelper:
 		
 		tidy = CSSTidy()
 		tidy.setSetting('template', self._settings['csstidy_beautify'])
-		tidy.setSetting('indent', '\t')
 		tidy.parse(doctxt)
 		formatted_css = tidy.Output('string')
 		
