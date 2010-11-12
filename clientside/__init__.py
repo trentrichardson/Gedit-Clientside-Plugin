@@ -25,6 +25,7 @@ import os
 import re
 import gzip
 import subprocess
+import pickle
 
 ui_str = """
 <ui>
@@ -40,6 +41,8 @@ ui_str = """
 					<menuitem name="ClientsideCSSMinify" action="ClientsideCSSMinify"/>
 					<separator />
 					<menuitem name="ClientsideGzip" action="ClientsideGzip"/>
+					<separator />
+					<menuitem name="ClientsideConfig" action="ClientsideConfig"/>
 				</menu>
 			</placeholder>
 		</menu>
@@ -58,27 +61,33 @@ class ClientsideWindowHelper:
 		
 		self.plugin_dir = os.path.split(__file__)[0]
 		self.config_store = os.path.join(self.plugin_dir, "defaults.pkl")
+		self.config_fields = { 'nodejs': None, 'braces_on_own_line': None, 'replace_contents': None }
 		
 		self._settings = {
-							'use_clipboard': True,
-							'nodejs': 'node',
-							'indent_size': '1',
-							'indent_char': '\t',
-							'braces_on_own_line': 'false',
-							'preserve_newlines': 'true',
-							'keep_array_indentation': 'true',
-							'space_after_anon_function': 'true',
-							'decompress': 'true',
-							'csstidy_minify': 'highest_compression',
-							'csstidy_beautify': 'low_compression',
-						}
+			'replace_contents': 2, # 0=clipboard, 1=replace, 2=ask what to do
+			'nodejs': 'node',
+			'indent_size': '1',
+			'indent_char': '\t',
+			'braces_on_own_line': 'false',
+			'preserve_newlines': 'true',
+			'keep_array_indentation': 'true',
+			'space_after_anon_function': 'true',
+			'decompress': 'true',
+			'csstidy_minify': 'highest_compression',
+			'csstidy_beautify': 'low_compression',
+		}
 		
 		self._insert_menu()
 		
-		self._find_nodejs_binary(['nodejs','node'])
+		self._read_config_file()
 
 	def deactivate(self):
 		self._remove_menu()
+		
+		#remove bottom tab if it exists
+		if self.pane:
+			self._window.get_bottom_panel().remove_item(self.pane)
+			self.pane = None
 		
 		self._window = None
 		self._plugin = None
@@ -97,7 +106,8 @@ class ClientsideWindowHelper:
 			("ClientsideJSLint", None, _("JSLint"), None, _("JSLint"), self.on_lint_js_activate),
 			("ClientsideCSSFormat", None, _("Format CSS"), None, _("Format and Clean CSS"), self.on_format_css_activate),
 			("ClientsideCSSMinify", None, _("Minify CSS"), "<Ctrl><Shift>U", _("Minify CSS"), self.on_minifier_css_activate),
-			("ClientsideGzip", None, _("Gzip Current File"), "<Ctrl><Alt>U", _("Gzip Current File"), self.on_minifier_gzip_activate)
+			("ClientsideGzip", None, _("Gzip Current File"), "<Ctrl><Alt>U", _("Gzip Current File"), self.on_minifier_gzip_activate),
+			("ClientsideConfig", None, _("Configure Plugin"),None, _("Configure Plugin"),self.open_config_window),
 		])
 		
 		manager.insert_action_group(self._action_group, -1)
@@ -125,16 +135,7 @@ class ClientsideWindowHelper:
 	
 	# -------------------------------------------------------------------------------
 	def _get_cmd_output(self,cmd):
-		#-----------------------
-		#fin,fout = os.popen4(cmd)
-		#result = fout.read()
-		#fin.close()
-		#fout.close()
 		
-		#-----------------------
-		#result = os.system(cmd)
-		
-		#-----------------------
 		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
 		#result = p.stdout.read()
 		#p.stdout.close()
@@ -143,16 +144,6 @@ class ClientsideWindowHelper:
 		
 		return result
 	
-	# -------------------------------------------------------------------------------
-	def _find_nodejs_binary(self, choices):
-		
-		for v in choices:
-			tmp = self._get_cmd_output("which "+ v)
-			if tmp != "":
-				self._settings['nodejs'] = v
-				return
-			
-		print "Unable to locate NodeJS. Is it installed?"
 	
 	# -------------------------------------------------------------------------------
 	def _import_gedit_preferences(self):
@@ -270,15 +261,18 @@ class ClientsideWindowHelper:
 			body = body.toString("utf8");
 			var result = JSLINT(body, {browser: true, forin: true});
 			var errors = [];
+			var out = '';
+			
 			if(JSLINT.errors){
 				for(var i=0; i<JSLINT.errors.length; i++){
 					if(JSLINT.errors[i]){
-						process.stdout.write(JSLINT.errors[i].line +','+ JSLINT.errors[i].character +',"'+ JSLINT.errors[i].reason.toString().replace('"','\"') +'"\\n');
+						out += JSLINT.errors[i].line +','+ JSLINT.errors[i].character +',"'+ JSLINT.errors[i].reason.toString().replace('"','\"') +'"\\n';
 						errors.push('{"reason":"' + JSLINT.errors[i].reason + '", "line":' + JSLINT.errors[i].line + ', "character":' + JSLINT.errors[i].character + '}');
 					}
 				}
 			}
-			process.exit(0);
+			
+			process.stdout.write(out);
 		''')
 		tmpfile.close()
 		
@@ -329,7 +323,6 @@ class ClientsideWindowHelper:
 			body = body.toString("utf8");
 			var result = js_beautify(body, options);
 			process.stdout.write(result);
-			process.exit(0);
 		''')
 		tmpfile.close()
 		
@@ -393,6 +386,9 @@ class ClientsideWindowHelper:
 		
 		if self._settings['indent_char'] == ' ':
 			formatted_css = re.sub(r'\t', ' '* int(self._settings['indent_size']), formatted_css)
+			
+		if self._settings['braces_on_own_line'] == 'true':
+			formatted_css = re.sub(r'\{', r'\n\{', formatted_css)
         
 		self.handle_new_output("Formatted CSS Copied to Clipboard.", formatted_css)
 		
@@ -505,9 +501,17 @@ class ClientsideWindowHelper:
 		self.clipboard.set_text(contents)
 		
 		# do we want to overwrite current document?
-		md = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL, message_format=remark)
-		response = md.run()
-		md.destroy()
+		response = gtk.RESPONSE_NO
+		
+		# go ahead and replace it
+		if self._settings['replace_contents'] == 1:
+			response = gtk.RESPONSE_YES
+			
+		# ask what to do	
+		elif self._settings['replace_contents'] == 2:
+			md = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL, message_format=remark)
+			response = md.run()
+			md.destroy()
 		
 		if response == gtk.RESPONSE_YES:
 			
@@ -517,7 +521,125 @@ class ClientsideWindowHelper:
 			
 			# in with the new
 			view.paste_clipboard()
+
+	#================================================================================
+	# Configuration Window
+	#================================================================================
+	def open_config_window(self, action=None):
+		app_inst = gedit.app_get_default()
+		active_window = app_inst.get_active_window()
+		
+		dialog = gtk.Dialog("Configure Gedit Problems Plugin", active_window, 0, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+		dialog.set_default_size(300, -1)
+		dialog.connect('response', self._save_config)
+		content_area = dialog.get_content_area()
+
+		table = gtk.Table(5, 4, False)	
+		table.set_row_spacings(8)	
+		table.set_col_spacings(10)
+		
+		core_label = gtk.Label()
+		core_label.set_markup("<b>Core Settings</b>")
+		core_label.set_alignment(xalign=0.0, yalign=0.5)
+		table.attach(core_label, 1, 4, 0, 1 )
+		
+		nodejs_label = gtk.Label()
+		nodejs_label.set_markup("How do I call NodeJS?")
+		nodejs_label.set_alignment(xalign=0.0, yalign=0.5)
+		table.attach(nodejs_label, 2, 3, 1, 2 )
+		
+		self.config_fields['nodejs'] = gtk.Entry()
+		self.config_fields['nodejs'].set_text(self._settings['nodejs'])
+		table.attach(self.config_fields['nodejs'], 3, 4, 1, 2 )
+		
+		nodejs_label = gtk.Label()
+		nodejs_label.set_markup("What do I do after I Minify or Format your code?")
+		nodejs_label.set_alignment(xalign=0.0, yalign=0.5)
+		table.attach(nodejs_label, 2, 4, 2, 3 )
+		
+		self.config_fields['replace_contents_0'] = gtk.RadioButton(None, "Copy to clipboard")
+		if self._settings['replace_contents'] == 0:
+			self.config_fields['replace_contents_0'].set_active(True)
+		table.attach(self.config_fields['replace_contents_0'], 2, 4, 3, 4 )
+		
+		self.config_fields['replace_contents_1'] = gtk.RadioButton(self.config_fields['replace_contents_0'], "Replace the current file")
+		if self._settings['replace_contents'] == 1:
+			self.config_fields['replace_contents_1'].set_active(True)
+		table.attach(self.config_fields['replace_contents_1'], 2, 4, 4, 5 )
+		
+		self.config_fields['replace_contents_2'] = gtk.RadioButton(self.config_fields['replace_contents_0'], "Ask me")
+		if self._settings['replace_contents'] == 2:
+			self.config_fields['replace_contents_2'].set_active(True)
+		table.attach(self.config_fields['replace_contents_2'], 2, 4, 5, 6 )
+
+		
+		formatting_label = gtk.Label()
+		formatting_label.set_markup("<b>Formatting</b>")
+		formatting_label.set_alignment(xalign=0.0, yalign=0.5)
+		table.attach(formatting_label, 1, 4, 6, 7 )
+		
+		self.config_fields['braces_on_own_line'] = gtk.CheckButton("Place braces on a new line")
+		if self._settings['braces_on_own_line'] == "true":
+			self.config_fields['braces_on_own_line'].set_active(True)
+		table.attach(self.config_fields['braces_on_own_line'], 2, 4, 7, 8 )
+		
+		content_area.pack_start(table, expand=False, fill=False, padding=10)
+		
+		
+		dialog.show_all()
+		
+		# from gedit preferences
+		if action is None:
+			return dialog
+
+		# from tools menu...
+		response_id = dialog.run()
+		
+	def _save_config(self, dialog, response_id):
+		if response_id == gtk.RESPONSE_OK:
+			
+			# where is nodejs
+			self._settings['nodejs'] = self.config_fields['nodejs'].get_text()
+			
+			# what to do when format or minify
+			if self.config_fields['replace_contents_0'].get_active():
+				self._settings['replace_contents'] = 0
+			elif self.config_fields['replace_contents_1'].get_active():
+				self._settings['replace_contents'] = 1
+			else:
+				self._settings['replace_contents']=2
+			
+			# when formatting put braces on new line?	
+			if self.config_fields['braces_on_own_line'].get_active():
+				self._settings['braces_on_own_line'] = "true"
+			else:
+				self._settings['braces_on_own_line'] = "false"
+			
+			self._write_config_file(self._settings)
+		
+		dialog.destroy()
+		
+	def _read_config_file(self):
+		
+		#if file doesn't exist, create it.. write defaults return
+		if not os.path.exists(self.config_store):
+			self._write_config_file(self._settings)
+			return self._settings
+		
+		pkl_file = open(self.config_store, 'rb')
+		self._settings = pickle.load(pkl_file)
+		pkl_file.close()
+		
+		return self._settings
 	
+	def _write_config_file(self, settings):
+				
+		output = open(self.config_store, 'wb')
+		pickle.dump(settings, output)
+		output.close()
+
+		return	
+
 
 #================================================================================
 # Clientside Plugin Class
@@ -536,4 +658,12 @@ class ClientsidePlugin(gedit.Plugin):
 	
 	def update_ui(self, window):
 		self._instances[window].update_ui()
-
+		
+	def create_configure_dialog(self):
+		app_inst = gedit.app_get_default()
+		active_window = app_inst.get_active_window()
+		
+		return self._instances[active_window].open_config_window()
+	
+	def is_configurable(self):
+		return True
