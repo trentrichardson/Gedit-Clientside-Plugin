@@ -52,6 +52,29 @@ INSTALL
 - Start or restart gedit
 - Open the Preferences, and navigate to Plugins, check to enable Clientside plugin
 
+CONFIGURE
+---------
+Once you've installed the plugin you can configure it to your needs through the Gedit Plugins Tab and click Configure, or through the Tools->Clientside menu.
+
+Since this plugin uses NodeJS it needs to know how to call it.  Inside the configuration window there is a field for the command to call from a terminal.  
+If you've installed nodejs manually, it is likely accessible through the command using "node".  However, though Ubuntu's package manager you will need to 
+use "nodejs".  And, on some occasions, you may have to actually point to the binary file location (Mac might be /usr/local/bin/node).  If you need help you 
+can try running in a terminal (unix or linux) the which tool: "which nodejs" or "which node".  This should print out a file path to the binary.
+
+When formmatting your code the clientside plugin tries to pull some settings from gedit, like whether to use tab characters or spaces, and how many spaces are 
+in a tab. The other setting is if brackets "{" should be placed on their own line.  Checking the box will result in:
+
+	if(str == "hello world")
+	{
+		// ...
+	}
+
+Unchecking the box will look like this:
+
+	if(str == "hello world"){
+		// ...
+	}
+
 USE
 ---
 
