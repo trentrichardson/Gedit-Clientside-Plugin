@@ -22,13 +22,15 @@ ABOUT
 -----
 This Gedit plugin provides common tools for developing with clientside languages 
 javascript and css. Tools for javascript include:
--JS-Beautifier to format and "Unminify"
--JSMin to minify
--JSLint to look for syntax issues
+
+- JS-Beautifier to format and "Unminify"
+- JSMin to minify
+- JSLint to look for syntax issues
 
 Tools for CSS:
--CSSTidy
--CSS Minification
+
+- CSSTidy
+- CSS Minification
 
 
 PREREQUISITES
@@ -45,18 +47,20 @@ The plugin uses nodejs to execute serverside javascript (jslint and jsbeautify)
 
 INSTALL
 -------
--Copy the clientside directory and clientside.gedit-plugin file into your 
+
+- Copy the clientside directory and clientside.gedit-plugin file into your 
 gedit plugins directory.
 
--Start or restart gedit
+- Start or restart gedit
 
--Open the Preferences, and navigate to Plugins, check to enable Clientside plugin
+- Open the Preferences, and navigate to Plugins, check to enable Clientside plugin
 
 USE
 ---
--With your js or css file the active document go to Tools -> Clientside -> desired tool
 
--When you minify, format, or gzip a file you will be asked if you want to replace the 
+- With your js or css file the active document go to Tools -> Clientside -> desired tool
+
+- When you minify, format, or gzip a file you will be asked if you want to replace the 
 current file contents
 
--With JSLint the bottom pane will have a new tab with any issues found
+- With JSLint the bottom pane will have a new tab with any issues found
