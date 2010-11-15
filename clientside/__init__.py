@@ -17,7 +17,6 @@
 
 from StringIO import StringIO
 from jsmin import JavascriptMinify
-from csstidy import CSSTidy
 
 import gtk
 import gedit
@@ -66,6 +65,7 @@ class ClientsideWindowHelper:
 		self._settings = {
 			'replace_contents': 2, # 0=clipboard, 1=replace, 2=ask what to do
 			'nodejs': 'node',
+			'php': 'php',
 			'indent_size': '1',
 			'indent_char': '\t',
 			'braces_on_own_line': 'false',
@@ -376,18 +376,23 @@ class ClientsideWindowHelper:
 		
 		self._import_gedit_preferences()
 		
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		csstidy_path = os.path.join(self.plugin_dir, "csstidy/g_format.php")
+		tmpcode_path = os.path.join(self.plugin_dir, "csstidy/tmp_csstidy_code.css")
 		
-		tidy = CSSTidy()
-		tidy.setSetting('template', self._settings['csstidy_beautify'])
-		tidy.parse(doctxt)
-		formatted_css = tidy.Output('string')
+		# store in tmp file
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		tmpcode = open(tmpcode_path,"w")
+		tmpcode.write(doctxt)
+		tmpcode.close()
+		
+		# run command
+		formatted_css = self._get_cmd_output(self._settings['php'] +' ' + csstidy_path)
 		
 		if self._settings['indent_char'] == ' ':
 			formatted_css = re.sub(r'\t', ' '* int(self._settings['indent_size']), formatted_css)
 			
-		if self._settings['braces_on_own_line'] == 'true':
-			formatted_css = re.sub(r'\{', r'\n\{', formatted_css)
+		if self._settings['braces_on_own_line'] == 'false':
+			formatted_css = re.sub(r'\n\{', r' {', formatted_css)
         
 		self.handle_new_output("Formatted CSS Copied to Clipboard.", formatted_css)
 		
@@ -398,15 +403,22 @@ class ClientsideWindowHelper:
 		doc = self._window.get_active_document()
 		if not doc:
 			return
-			
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
-		formatted_css = self.get_minified_css_str(doctxt)
 		
-		# our function seems better than csstidy :-/
-		#tidy = CSSTidy()
-		#tidy.setSetting('template', self._settings['csstidy_minify'])
-		#tidy.parse(doctxt)
-		#formatted_css = tidy.Output('string')
+		#our backup method.. works pretty good..	
+		#doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		#formatted_css = self.get_minified_css_str(doctxt)
+		
+		csstidy_path = os.path.join(self.plugin_dir, "csstidy/g_minify.php")
+		tmpcode_path = os.path.join(self.plugin_dir, "csstidy/tmp_csstidy_code.css")
+		
+		# store in tmp file
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		tmpcode = open(tmpcode_path,"w")
+		tmpcode.write(doctxt)
+		tmpcode.close()
+		
+		# run command
+		formatted_css = self._get_cmd_output(self._settings['php'] +' ' + csstidy_path)
 		
 		self.handle_new_output("Minified CSS Copied to Clipboard.", formatted_css)
 		
@@ -550,37 +562,46 @@ class ClientsideWindowHelper:
 		self.config_fields['nodejs'] = gtk.Entry()
 		self.config_fields['nodejs'].set_text(self._settings['nodejs'])
 		table.attach(self.config_fields['nodejs'], 3, 4, 1, 2 )
+				
+		php_label = gtk.Label()
+		php_label.set_markup("How do I call PHP?")
+		php_label.set_alignment(xalign=0.0, yalign=0.5)
+		table.attach(php_label, 2, 3, 2, 3 )
 		
-		nodejs_label = gtk.Label()
-		nodejs_label.set_markup("What do I do after I Minify or Format your code?")
-		nodejs_label.set_alignment(xalign=0.0, yalign=0.5)
-		table.attach(nodejs_label, 2, 4, 2, 3 )
+		self.config_fields['php'] = gtk.Entry()
+		self.config_fields['php'].set_text(self._settings['php'])
+		table.attach(self.config_fields['php'], 3, 4, 2, 3 )
+		
+		after_label = gtk.Label()
+		after_label.set_markup("What do I do after I Minify or Format your code?")
+		after_label.set_alignment(xalign=0.0, yalign=0.5)
+		table.attach(after_label, 2, 4, 3, 4 )
 		
 		self.config_fields['replace_contents_0'] = gtk.RadioButton(None, "Copy to clipboard")
 		if self._settings['replace_contents'] == 0:
 			self.config_fields['replace_contents_0'].set_active(True)
-		table.attach(self.config_fields['replace_contents_0'], 2, 4, 3, 4 )
+		table.attach(self.config_fields['replace_contents_0'], 2, 4, 4, 5 )
 		
 		self.config_fields['replace_contents_1'] = gtk.RadioButton(self.config_fields['replace_contents_0'], "Replace the current file")
 		if self._settings['replace_contents'] == 1:
 			self.config_fields['replace_contents_1'].set_active(True)
-		table.attach(self.config_fields['replace_contents_1'], 2, 4, 4, 5 )
+		table.attach(self.config_fields['replace_contents_1'], 2, 4, 5, 6 )
 		
 		self.config_fields['replace_contents_2'] = gtk.RadioButton(self.config_fields['replace_contents_0'], "Ask me")
 		if self._settings['replace_contents'] == 2:
 			self.config_fields['replace_contents_2'].set_active(True)
-		table.attach(self.config_fields['replace_contents_2'], 2, 4, 5, 6 )
+		table.attach(self.config_fields['replace_contents_2'], 2, 4, 6, 7 )
 
 		
 		formatting_label = gtk.Label()
 		formatting_label.set_markup("<b>Formatting</b>")
 		formatting_label.set_alignment(xalign=0.0, yalign=0.5)
-		table.attach(formatting_label, 1, 4, 6, 7 )
+		table.attach(formatting_label, 1, 4, 7, 8 )
 		
 		self.config_fields['braces_on_own_line'] = gtk.CheckButton("Place braces on a new line")
 		if self._settings['braces_on_own_line'] == "true":
 			self.config_fields['braces_on_own_line'].set_active(True)
-		table.attach(self.config_fields['braces_on_own_line'], 2, 4, 7, 8 )
+		table.attach(self.config_fields['braces_on_own_line'], 2, 4, 8, 9 )
 		
 		content_area.pack_start(table, expand=False, fill=False, padding=10)
 		
@@ -599,6 +620,9 @@ class ClientsideWindowHelper:
 			
 			# where is nodejs
 			self._settings['nodejs'] = self.config_fields['nodejs'].get_text()
+			
+			# where is php
+			self._settings['php'] = self.config_fields['php'].get_text()
 			
 			# what to do when format or minify
 			if self.config_fields['replace_contents_0'].get_active():

@@ -1,7 +1,7 @@
 <?php
 	include('class.csstidy.php');
 	
-	$css_file = "tmp_csstidy_code.css";
+	$css_file = dirname(__FILE__). "/tmp_csstidy_code.css";
 	
 	$f = fopen($css_file, "r");
 	$css_code = fread($f, filesize($css_file));
