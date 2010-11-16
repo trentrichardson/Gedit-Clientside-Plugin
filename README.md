@@ -30,7 +30,7 @@ javascript and css. Tools for javascript include:
 Tools for CSS:
 
 - [CSSTidy](http://csstidy.sourceforge.net/) to format and clean
-- CSS Minification
+- CSS Minification (also CSSTidy)
 
 
 PREREQUISITES
@@ -44,6 +44,7 @@ For Ubuntu use:
 For other linux distrobutions this may be a click away in your package manager. 
 The plugin uses nodejs to execute serverside javascript (jslint and jsbeautify)
 
+PHP for running PHP version of CSSTidy
 
 INSTALL
 -------
