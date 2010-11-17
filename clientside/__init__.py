@@ -540,7 +540,7 @@ class ClientsideWindowHelper:
 		app_inst = gedit.app_get_default()
 		active_window = app_inst.get_active_window()
 		
-		dialog = gtk.Dialog("Configure Gedit Problems Plugin", active_window, 0, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+		dialog = gtk.Dialog("Configure Gedit Clientside Plugin", active_window, 0, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
 		dialog.set_default_size(300, -1)
 		dialog.connect('response', self._save_config)
 		content_area = dialog.get_content_area()
