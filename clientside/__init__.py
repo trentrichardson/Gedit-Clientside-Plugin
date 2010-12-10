@@ -188,8 +188,8 @@ class ClientsideWindowHelper:
 		
 		# errorlist = [ [line_num, char_position, "error text"],... ] 
 		for e in errorlist:
-			self.errorlines.append([int(e[0]), int(e[1]), e[2]])
-			self.lines.append([int(e[0]-1), int(e[1]-1)])
+			self.errorlines.append([int(e['line']), int(e['char']), e['text']])
+			self.lines.append([int(e['line']-1), int(e['char']-1)])
         
 		self._window.get_bottom_panel().set_property("visible", True)
 		self._window.get_bottom_panel().activate_item(self.pane)
@@ -295,7 +295,14 @@ class ClientsideWindowHelper:
 		for e in jslint_results:
 			tmpparts = e.split(',')#re.split(r'\s*("[^"]*"|.*?)\s*,',e)
 			if len(tmpparts) > 0:
-				elist.append([int(tmpparts[0]), int(tmpparts[1]), tmpparts[2]])
+				tmperr = { 
+					'line': int(tmpparts[0]), 
+					'char': int(tmpparts[1]), 
+					'text': tmpparts[2] 
+				}
+				tmperr['text'] = re.sub(r'^\"','', tmperr['text'])
+				tmperr['text'] = re.sub(r'\"$','', tmperr['text'])
+				elist.append( tmperr )
 		
 		self.create_bottom_tab()
 		self.populate_bottom_tab(elist)
