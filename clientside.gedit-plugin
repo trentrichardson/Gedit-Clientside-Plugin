@@ -5,6 +5,6 @@ IAge=2
 Name=Clientside
 Description=Plugin to minify, beautify, and verify js and css
 Authors=Trent Richardson
-Copyright=Copyright © 2010 Trent Richardson
+Copyright=Copyright © 2011 Trent Richardson
 Website=http://trentrichardson.com
 Icon=gtk-convert

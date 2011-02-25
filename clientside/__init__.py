@@ -1,4 +1,4 @@
-# Copyright 2010 Trent Richardson
+# Copyright 2011 Trent Richardson
 #
 # This file is part of Gedit Clientside Plugin.
 #
