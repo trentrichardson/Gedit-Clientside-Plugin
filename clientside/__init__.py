@@ -34,10 +34,12 @@ ui_str = """
 				<menu name="ClientsideMenu" action="ClientsideMenuAction">
 					<menuitem name="ClientsideJSFormat" action="ClientsideJSFormat"/>
 					<menuitem name="ClientsideJSMinify" action="ClientsideJSMinify"/>
+					<menuitem name="ClientsideJSBatchMinify" action="ClientsideJSBatchMinify"/>
 					<menuitem name="ClientsideJSLint" action="ClientsideJSLint"/>
 					<separator />
 					<menuitem name="ClientsideCSSFormat" action="ClientsideCSSFormat"/>
 					<menuitem name="ClientsideCSSMinify" action="ClientsideCSSMinify"/>
+					<menuitem name="ClientsideCSSBatchMinify" action="ClientsideCSSBatchMinify"/>
 					<separator />
 					<menuitem name="ClientsideGzip" action="ClientsideGzip"/>
 					<separator />
@@ -103,9 +105,11 @@ class ClientsideWindowHelper:
 			("ClientsideMenuAction", None, _("Clientside"), None, _("Clientside Tools : For JS and CSS"), None),
 			("ClientsideJSFormat", None, _("Format JS"), None, _("Format JS"), self.on_format_js_activate),
 			("ClientsideJSMinify", None, _("Minify JS"), "<Ctrl>U", _("Minify JS"), self.on_minifier_js_activate),
+			("ClientsideJSBatchMinify", None, _("Batch Minify JS"), None, _("Batch Minify JS"), self.on_batch_minifier_js_activate),
 			("ClientsideJSLint", None, _("JSLint"), None, _("JSLint"), self.on_lint_js_activate),
 			("ClientsideCSSFormat", None, _("Format CSS"), None, _("Format and Clean CSS"), self.on_format_css_activate),
 			("ClientsideCSSMinify", None, _("Minify CSS"), "<Ctrl><Shift>U", _("Minify CSS"), self.on_minifier_css_activate),
+			("ClientsideCSSBatchMinify", None, _("Batch Minify CSS"), None, _("Batch Minify CSS"), self.on_batch_minifier_css_activate),
 			("ClientsideGzip", None, _("Gzip Current File"), "<Ctrl><Alt>U", _("Gzip Current File"), self.on_minifier_gzip_activate),
 			("ClientsideConfig", None, _("Configure Plugin"),None, _("Configure Plugin"),self.open_config_window),
 		])
@@ -307,6 +311,7 @@ class ClientsideWindowHelper:
 		self.create_bottom_tab()
 		self.populate_bottom_tab(elist)
 		
+
 	# -------------------------------------------------------------------------------	
 	# js beautify button click
 	def on_format_js_activate(self, action):
@@ -314,40 +319,11 @@ class ClientsideWindowHelper:
 		if not doc:
 			return
 		
-		self._import_gedit_preferences()
-		
-		jsbeautify_path = os.path.join(self.plugin_dir, "jsbeautify/beautify")
-		tmpfile_path = os.path.join(self.plugin_dir, "tmp_jsbeautify.js")
-		tmpcode_path = os.path.join(self.plugin_dir, "tmp_jsbeautify_code.js")
-		
-		tmpfile = open(tmpfile_path,"w")
-		tmpfile.writelines("var sys = require('sys');")
-		tmpfile.writelines("var fs = require('fs');")
-		tmpfile.writelines("var js_beautify = require('" + jsbeautify_path + "').js_beautify;")
-		tmpfile.writelines("var body = fs.readFileSync('" + tmpcode_path + "');")
-		tmpfile.writelines("var options = { indent_size: "+ self._settings['indent_size'] +", indent_char: '"+ self._settings['indent_char'] +"', preserve_newlines: "+ self._settings['preserve_newlines'] +", space_after_anon_function: "+ self._settings['space_after_anon_function'] +", keep_array_indentation: "+ self._settings['keep_array_indentation'] +", braces_on_own_line: "+ self._settings['braces_on_own_line'] +" };")
-		tmpfile.write('''
-			body = body.toString("utf8");
-			var result = js_beautify(body, options);
-			process.stdout.write(result);
-		''')
-		tmpfile.close()
-		
-		# store in tmp file
 		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
-		tmpcode = open(tmpcode_path,"w")
-		tmpcode.write(doctxt)
-		tmpcode.close()
-		
-		# run command
-		result = self._get_cmd_output(self._settings['nodejs'] +' ' + tmpfile_path)
-		
-		#clean up
-		os.remove(tmpcode_path)
-		os.remove(tmpfile_path)
+		formatted_js = self.get_formatted_js_str(doctxt)
 		
 		#print result
-		self.handle_new_output("Formatted JS Copied to Clipboard.", result)
+		self.handle_new_output("Formatted JS Copied to Clipboard.", formatted_js)
 		
 	
 	# -------------------------------------------------------------------------------	
@@ -358,21 +334,19 @@ class ClientsideWindowHelper:
 			return
 			
 		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		min_js = self.get_minified_js_str(doctxt)
 		
-		ins = StringIO(doctxt)
-		outs = StringIO()
+		self.handle_new_output("Minified JS Copied to CLipboard", min_js)	
+
+
+	# -------------------------------------------------------------------------------
+	# js batch minify button click (choose several files and minify them all)
+	def on_batch_minifier_js_activate(self, action):
 		
-		JavascriptMinify().minify(ins, outs)
-		
-		min_js = outs.getvalue()
-		
-		if len(min_js) > 0 and min_js[0] == '\n':
-			min_js = min_js[1:]
-		
-		min_js = re.sub(r'(\n|\r)+','', min_js)
-		
-		self.handle_new_output("Minified JS Copied to CLipboard", min_js)
-		
+		self.get_batch_minify_files_str('Javascript Files', 'js')
+
+		return	
+
 
 	# -------------------------------------------------------------------------------
 	# css format button click
@@ -381,55 +355,34 @@ class ClientsideWindowHelper:
 		if not doc:
 			return
 		
-		self._import_gedit_preferences()
-		
-		csstidy_path = os.path.join(self.plugin_dir, "csstidy/g_format.php")
-		tmpcode_path = os.path.join(self.plugin_dir, "csstidy/tmp_csstidy_code.css")
-		
-		# store in tmp file
 		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
-		tmpcode = open(tmpcode_path,"w")
-		tmpcode.write(doctxt)
-		tmpcode.close()
-		
-		# run command
-		formatted_css = self._get_cmd_output(self._settings['php'] +' ' + csstidy_path)
-		
-		if self._settings['indent_char'] == ' ':
-			formatted_css = re.sub(r'\t', ' '* int(self._settings['indent_size']), formatted_css)
-			
-		if self._settings['braces_on_own_line'] == 'false':
-			formatted_css = re.sub(r'\n\{', r' {', formatted_css)
+		formatted_css = self.get_formatted_css_str(doctxt)
         
 		self.handle_new_output("Formatted CSS Copied to Clipboard.", formatted_css)
 		
 	
-	# -------------------------------------------------------------------------------	
+	# -------------------------------------------------------------------------------
 	# css minify button click
 	def on_minifier_css_activate(self, action):
 		doc = self._window.get_active_document()
 		if not doc:
 			return
-		
-		#our backup method.. works pretty good..	
-		#doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
-		#formatted_css = self.get_minified_css_str(doctxt)
-		
-		csstidy_path = os.path.join(self.plugin_dir, "csstidy/g_minify.php")
-		tmpcode_path = os.path.join(self.plugin_dir, "csstidy/tmp_csstidy_code.css")
-		
-		# store in tmp file
+			
 		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
-		tmpcode = open(tmpcode_path,"w")
-		tmpcode.write(doctxt)
-		tmpcode.close()
+		min_css = self.get_minified_css_str(doctxt)
 		
-		# run command
-		formatted_css = self._get_cmd_output(self._settings['php'] +' ' + csstidy_path)
-		
-		self.handle_new_output("Minified CSS Copied to Clipboard.", formatted_css)
-		
+		self.handle_new_output("Minified CSS Copied to Clipboard.", min_css)
 	
+
+	# -------------------------------------------------------------------------------
+	# css batch minify button click (choose several files and minify them all)
+	def on_batch_minifier_css_activate(self, action):
+		
+		self.get_batch_minify_files_str('CSS Files', 'css')
+		
+		return	
+	
+
 	# -------------------------------------------------------------------------------
 	# gzip button click
 	def on_minifier_gzip_activate(self, action):
@@ -465,9 +418,159 @@ class ClientsideWindowHelper:
 	#================================================================================
 	
 	# -------------------------------------------------------------------------------
+	# minify a string of css
+	def get_minified_css_str(self, css):
+		
+		csstidy_path = os.path.join(self.plugin_dir, "csstidy/g_minify.php")
+		tmpcode_path = os.path.join(self.plugin_dir, "csstidy/tmp_csstidy_code.css")
+		
+		# store in tmp file
+		tmpcode = open(tmpcode_path,"w")
+		tmpcode.write(css)
+		tmpcode.close()
+		
+		# run command
+		min_css = self._get_cmd_output(self._settings['php'] +' ' + csstidy_path)
+		
+		return min_css	
+	
+	# -------------------------------------------------------------------------------
+	# format a string of css
+	def get_formatted_css_str(self, css):
+		
+		self._import_gedit_preferences()
+		
+		csstidy_path = os.path.join(self.plugin_dir, "csstidy/g_format.php")
+		tmpcode_path = os.path.join(self.plugin_dir, "csstidy/tmp_csstidy_code.css")
+		
+		# store in tmp file
+		tmpcode = open(tmpcode_path,"w")
+		tmpcode.write(css)
+		tmpcode.close()
+		
+		# run command
+		formatted_css = self._get_cmd_output(self._settings['php'] +' ' + csstidy_path)
+		
+		if self._settings['indent_char'] == ' ':
+			formatted_css = re.sub(r'\t', ' '* int(self._settings['indent_size']), formatted_css)
+			
+		if self._settings['braces_on_own_line'] == 'false':
+			formatted_css = re.sub(r'\n\{', r' {', formatted_css)
+			
+		return formatted_css
+	
+	# -------------------------------------------------------------------------------
+	# minify a string of js
+	def get_minified_js_str(self, js):
+		
+		ins = StringIO(js)
+		outs = StringIO()
+		
+		JavascriptMinify().minify(ins, outs)
+		
+		min_js = outs.getvalue()
+		
+		if len(min_js) > 0 and min_js[0] == '\n':
+			min_js = min_js[1:]
+		
+		min_js = re.sub(r'(\n|\r)+','', min_js)
+		
+		return min_js
+	
+	# -------------------------------------------------------------------------------
+	# format a string of js
+	def get_formatted_js_str(self, js):
+		
+		self._import_gedit_preferences()
+		
+		jsbeautify_path = os.path.join(self.plugin_dir, "jsbeautify/beautify")
+		tmpfile_path = os.path.join(self.plugin_dir, "tmp_jsbeautify.js")
+		tmpcode_path = os.path.join(self.plugin_dir, "tmp_jsbeautify_code.js")
+		
+		tmpfile = open(tmpfile_path,"w")
+		tmpfile.writelines("var sys = require('sys');")
+		tmpfile.writelines("var fs = require('fs');")
+		tmpfile.writelines("var js_beautify = require('" + jsbeautify_path + "').js_beautify;")
+		tmpfile.writelines("var body = fs.readFileSync('" + tmpcode_path + "');")
+		tmpfile.writelines("var options = { indent_size: "+ self._settings['indent_size'] +", indent_char: '"+ self._settings['indent_char'] +"', preserve_newlines: "+ self._settings['preserve_newlines'] +", space_after_anon_function: "+ self._settings['space_after_anon_function'] +", keep_array_indentation: "+ self._settings['keep_array_indentation'] +", braces_on_own_line: "+ self._settings['braces_on_own_line'] +" };")
+		tmpfile.write('''
+			body = body.toString("utf8");
+			var result = js_beautify(body, options);
+			process.stdout.write(result);
+		''')
+		tmpfile.close()
+		
+		# store in tmp file
+		tmpcode = open(tmpcode_path,"w")
+		tmpcode.write(js)
+		tmpcode.close()
+		
+		# run command
+		result = self._get_cmd_output(self._settings['nodejs'] +' ' + tmpfile_path)
+		
+		#clean up
+		os.remove(tmpcode_path)
+		os.remove(tmpfile_path)
+		
+		return result
+	
+	# -------------------------------------------------------------------------------
+	# choose files, minify them, and return a string
+	def get_batch_minify_files_str(self, filter_name, filter_type):
+		
+		dialog = gtk.FileChooserDialog("Choose "+filter_name, None, gtk.FILE_CHOOSER_ACTION_OPEN, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+		dialog.set_default_response(gtk.RESPONSE_OK)
+		dialog.set_select_multiple(True)
+		
+		filter = gtk.FileFilter()
+		filter.set_name(filter_name)
+		filter.add_pattern("*."+ filter_type)
+		dialog.add_filter(filter)
+
+		response = dialog.run()
+		
+		if response == gtk.RESPONSE_OK:
+			filenames = dialog.get_filenames()
+			
+			if filenames:
+				min_code = ''
+				charset = ''
+				charsetre = r'(@charset \".+\";)'
+				
+				# TODO: here instead of proceeding lets open a dialog with a list store and 
+				# allow the user to order the selections, then loop through the liststore
+				
+				for file in filenames:
+					tmpcode = open(file,"r")
+					tmpread = tmpcode.read()
+					tmpcode.close()
+					
+					if filter_type == 'css':
+						
+						#if there is a charset, keep up with it so we can add only one per file
+						tmpcharset = re.findall(charsetre, tmpread)
+						if tmpcharset:
+							charset = tmpcharset[0]
+							tmpread = re.sub(charsetre, '', tmpread)
+						
+						tmpread = self.get_minified_css_str(tmpread)
+						
+					else:
+						tmpread = self.get_minified_js_str(tmpread)
+						
+					min_code = min_code + '/* '+ os.path.basename(file) + ' */\n'+ tmpread + '\n\n'
+				
+				if charset != '':
+					min_code = charset + '\n\n' + min_code;
+					
+				self.handle_new_output("Batched and Minified "+ filter_name +" Copied to Clipboard.", min_code)
+				
+		dialog.destroy()
+		
+	# -------------------------------------------------------------------------------
 	# the guts of how to minify css: 
 	# credit: http://stackoverflow.com/questions/222581/python-script-for-minifying-css
-	def get_minified_css_str(self, css):
+	def get_minified_css_str_original(self, css):
 		
 		# remove comments - this will break a lot of hacks :-P
 		css = re.sub( r'\s*/\*\s*\*/', "$$HACK1$$", css ) # preserve IE<6 comment hack
