@@ -518,27 +518,67 @@ class ClientsideWindowHelper:
 	# choose files, minify them, and return a string
 	def get_batch_minify_files_str(self, filter_name, filter_type):
 		
-		dialog = gtk.FileChooserDialog("Choose "+filter_name, None, gtk.FILE_CHOOSER_ACTION_OPEN, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-		dialog.set_default_response(gtk.RESPONSE_OK)
-		dialog.set_select_multiple(True)
+		app_inst = gedit.app_get_default()
+		active_window = app_inst.get_active_window()
 		
-		filter = gtk.FileFilter()
-		filter.set_name(filter_name)
-		filter.add_pattern("*."+ filter_type)
-		dialog.add_filter(filter)
+		dialog = gtk.Dialog("Select Files to Minify", active_window, 0, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+		dialog.set_default_size(400, -1)
+		content_area = dialog.get_content_area()
+		
+		treestore = gtk.TreeStore(str,str)
+		treeview = gtk.TreeView(treestore)
+		treeview.set_size_request(400, 150)
+		
+		#column 1
+		cell = gtk.CellRendererText()
+		col = gtk.TreeViewColumn("File", cell, text=0)
+		treeview.append_column(col)
+		
+		#column 2
+		cell = gtk.CellRendererText()
+		col = gtk.TreeViewColumn("Path", cell, text=1)
+		treeview.append_column(col)
+
+		self.treeview_setup_dnd(treeview)
+
+		content_area.pack_start(treeview, expand=False, fill=False, padding=0)
+		
+		hb = gtk.HBox(False)
+		
+		#add button
+		btn_add = gtk.Button(label="+")
+		btn_add.set_size_request(20, 20)
+		btn_add.connect('clicked', self.treeview_add_clicked, treeview, filter_name, filter_type)
+		vb = gtk.VBox()
+		vb.pack_start(btn_add, False)
+		hb.pack_start(vb, False)
+		
+		#remove button
+		btn_remove = gtk.Button(label="-")
+		btn_remove.set_size_request(20, 20)
+		btn_remove.connect('clicked', self.treeview_remove_clicked, treeview)
+		vb = gtk.VBox()
+		vb.pack_start(btn_remove)
+		hb.pack_start(vb, False)
+		
+		content_area.pack_start(hb, expand=False, fill=False, padding=0)
+		
+		dialog.show_all()
 
 		response = dialog.run()
 		
+		
 		if response == gtk.RESPONSE_OK:
-			filenames = dialog.get_filenames()
+			model = treeview.get_model()
+			filenames = []
 			
+			for r in model:
+				filenames.append(r[1])
+				
 			if filenames:
 				min_code = ''
 				charset = ''
 				charsetre = r'(@charset \".+\";)'
-				
-				# TODO: here instead of proceeding lets open a dialog with a list store and 
-				# allow the user to order the selections, then loop through the liststore
 				
 				for file in filenames:
 					tmpcode = open(file,"r")
@@ -563,10 +603,63 @@ class ClientsideWindowHelper:
 				if charset != '':
 					min_code = charset + '\n\n' + min_code;
 					
-				self.handle_new_output("Batched and Minified "+ filter_name +" Copied to Clipboard.", min_code)
-				
+				self.handle_new_output("Batched and Minified "+ filter_name +" Copied to Clipboard.", min_code.strip())
+			
 		dialog.destroy()
 		
+	#add items to the tree store
+	def treeview_add_clicked(self, button, treeview, filter_name, filter_type):
+		model = treeview.get_model()
+		
+		dialog = gtk.FileChooserDialog("Choose "+filter_name, None, gtk.FILE_CHOOSER_ACTION_OPEN, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,gtk.STOCK_OPEN, gtk.RESPONSE_OK))
+		dialog.set_default_response(gtk.RESPONSE_OK)
+		dialog.set_select_multiple(True)
+		
+		filter = gtk.FileFilter()
+		filter.set_name(filter_name)
+		filter.add_pattern("*."+ filter_type)
+		dialog.add_filter(filter)
+
+		response = dialog.run()
+		
+		if response == gtk.RESPONSE_OK:
+			filenames = dialog.get_filenames()
+			
+			if filenames:
+				for file in filenames:
+					model.append(parent=None, row=[ os.path.basename(file), file ] )
+					
+		dialog.destroy()
+	
+	# remove items from the Treestore	
+	def treeview_remove_clicked(self, button, treeview):
+		model, source = treeview.get_selection().get_selected()
+		if source:
+			model.remove(source)
+	
+	# handle treeview drag and drop
+	def treeview_setup_dnd(self, treeview):
+	    target_entries = [('example', gtk.TARGET_SAME_WIDGET, 0)]
+	    treeview.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, target_entries, gtk.gdk.ACTION_MOVE)
+	    treeview.enable_model_drag_dest(target_entries, gtk.gdk.ACTION_MOVE)
+	    treeview.connect('drag-data-received', self.treeview_on_drag_data_received)
+	    
+	def treeview_on_drag_data_received(self, treeview, drag_context, x, y, selection_data, info, eventtime):
+		target_path, drop_position = treeview.get_dest_row_at_pos(x, y)
+		model, source = treeview.get_selection().get_selected()
+		target = model.get_iter(target_path)
+		if not model.is_ancestor(source, target):
+			
+			if drop_position == gtk.TREE_VIEW_DROP_BEFORE:
+				model.move_before(source, target)
+			elif drop_position == gtk.TREE_VIEW_DROP_AFTER:
+				model.move_after(source, target)
+				
+			drag_context.finish(success=True, del_=False, time=eventtime)
+		else:
+			drag_context.finish(success=False, del_=False, time=eventtime)
+	
+	
 	# -------------------------------------------------------------------------------
 	# the guts of how to minify css: 
 	# credit: http://stackoverflow.com/questions/222581/python-script-for-minifying-css
