@@ -546,16 +546,24 @@ class ClientsideWindowHelper:
 		hb = gtk.HBox(False)
 		
 		#add button
-		btn_add = gtk.Button(label="+")
-		btn_add.set_size_request(20, 20)
+		img = gtk.Image()
+		img.set_from_stock(gtk.STOCK_ADD, gtk.ICON_SIZE_SMALL_TOOLBAR)
+		btn_add = gtk.Button()
+		btn_add.set_image(img)
+		#btn_add = gtk.Button(label="+")
+		#btn_add.set_size_request(20, 20)
 		btn_add.connect('clicked', self.treeview_add_clicked, treeview, filter_name, filter_type)
 		vb = gtk.VBox()
 		vb.pack_start(btn_add, False)
 		hb.pack_start(vb, False)
 		
 		#remove button
-		btn_remove = gtk.Button(label="-")
-		btn_remove.set_size_request(20, 20)
+		img = gtk.Image()
+		img.set_from_stock(gtk.STOCK_REMOVE, gtk.ICON_SIZE_SMALL_TOOLBAR)
+		btn_remove = gtk.Button()
+		btn_remove.set_image(img)
+		#btn_remove = gtk.Button(label="-")
+		#btn_remove.set_size_request(20, 20)
 		btn_remove.connect('clicked', self.treeview_remove_clicked, treeview)
 		vb = gtk.VBox()
 		vb.pack_start(btn_remove)
@@ -565,6 +573,9 @@ class ClientsideWindowHelper:
 		
 		dialog.show_all()
 
+		#kick start the batch by opening the file dialog
+		self.treeview_add_clicked(btn_add, treeview, filter_name, filter_type)
+		
 		response = dialog.run()
 		
 		
