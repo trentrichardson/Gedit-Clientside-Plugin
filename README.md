@@ -1,7 +1,7 @@
 Gedit Clientside Plugin
 =======================
 
-Copyright 2010 Trent Richardson
+Copyright 2011 Trent Richardson
 
 This file is part of Gedit Clientside Plugin.
 
@@ -32,6 +32,7 @@ Tools for CSS:
 - [CSSTidy](http://csstidy.sourceforge.net/) to format and clean
 - CSS Minification (also CSSTidy)
 
+Author: [Trent Richardson](http://trentrichardson.com)
 
 PREREQUISITES
 -------------
@@ -82,3 +83,4 @@ USE
 - With your js or css file the active document go to Tools -> Clientside -> desired tool
 - When you minify, format, or gzip a file you will be asked if you want to replace the current file contents
 - With JSLint the bottom pane will have a new tab with any issues found
+- For Batch Minify click the + icon and choose your files.  Drag and drop them in the grid to reorder them.
