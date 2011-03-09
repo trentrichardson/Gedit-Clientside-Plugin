@@ -17,6 +17,7 @@
 
 from StringIO import StringIO
 from jsmin import JavascriptMinify
+from cssmin import CSSMin
 
 import gtk
 import gedit
@@ -67,7 +68,6 @@ class ClientsideWindowHelper:
 		self._settings = {
 			'replace_contents': 2, # 0=clipboard, 1=replace, 2=ask what to do
 			'nodejs': 'node',
-			'php': 'php',
 			'indent_size': '1',
 			'indent_char': '\t',
 			'braces_on_own_line': 'false',
@@ -421,16 +421,7 @@ class ClientsideWindowHelper:
 	# minify a string of css
 	def get_minified_css_str(self, css):
 		
-		csstidy_path = os.path.join(self.plugin_dir, "csstidy/g_minify.php")
-		tmpcode_path = os.path.join(self.plugin_dir, "csstidy/tmp_csstidy_code.css")
-		
-		# store in tmp file
-		tmpcode = open(tmpcode_path,"w")
-		tmpcode.write(css)
-		tmpcode.close()
-		
-		# run command
-		min_css = self._get_cmd_output(self._settings['php'] +' ' + csstidy_path)
+		min_css = CSSMin().minify(css)
 		
 		return min_css	
 	
@@ -440,22 +431,10 @@ class ClientsideWindowHelper:
 		
 		self._import_gedit_preferences()
 		
-		csstidy_path = os.path.join(self.plugin_dir, "csstidy/g_format.php")
-		tmpcode_path = os.path.join(self.plugin_dir, "csstidy/tmp_csstidy_code.css")
-		
-		# store in tmp file
-		tmpcode = open(tmpcode_path,"w")
-		tmpcode.write(css)
-		tmpcode.close()
-		
-		# run command
-		formatted_css = self._get_cmd_output(self._settings['php'] +' ' + csstidy_path)
-		
-		if self._settings['indent_char'] == ' ':
-			formatted_css = re.sub(r'\t', ' '* int(self._settings['indent_size']), formatted_css)
+		braces_new_line = (self._settings['braces_on_own_line'] == 'true')
+		tab = self._settings['indent_char'] * int(self._settings['indent_size'])
 			
-		if self._settings['braces_on_own_line'] == 'false':
-			formatted_css = re.sub(r'\n\{', r' {', formatted_css)
+		formatted_css = CSSMin().format(css, braces_new_line, tab)
 			
 		return formatted_css
 	
@@ -671,49 +650,7 @@ class ClientsideWindowHelper:
 			drag_context.finish(success=False, del_=False, time=eventtime)
 	
 	
-	# -------------------------------------------------------------------------------
-	# the guts of how to minify css: 
-	# credit: http://stackoverflow.com/questions/222581/python-script-for-minifying-css
-	def get_minified_css_str_original(self, css):
-		
-		# remove comments - this will break a lot of hacks :-P
-		css = re.sub( r'\s*/\*\s*\*/', "$$HACK1$$", css ) # preserve IE<6 comment hack
-		css = re.sub( r'/\*[\s\S]*?\*/', "", css )
-		css = css.replace( "$$HACK1$$", '/**/' ) # preserve IE<6 comment hack
-		
-		# url() doesn't need quotes
-		css = re.sub( r'url\((["\'])([^)]*)\1\)', r'url(\2)', css )
-		
-		# spaces may be safely collapsed as generated content will collapse them anyway
-		css = re.sub( r'\s+', ' ', css )
-		
-		# shorten collapsable colors: #aabbcc to #abc
-		css = re.sub( r'#([0-9a-f])\1([0-9a-f])\2([0-9a-f])\3(\s|;)', r'#\1\2\3\4', css )
-		
-		# fragment values can loose zeros
-		css = re.sub( r':\s*0(\.\d+([cm]m|e[mx]|in|p[ctx]))\s*;', r':\1;', css )
-		
-		min_css = ""
-		
-		for rule in re.findall( r'([^{]+){([^}]*)}', css ):
-		
-			# we don't need spaces around operators
-			selectors = [re.sub( r'(?<=[\[\(>+=])\s+|\s+(?=[=~^$*|>+\]\)])', r'', selector.strip() ) for selector in rule[0].split( ',' )]
-			
-			# order is important, but we still want to discard repetitions
-			properties = {}
-			porder = []
-			for prop in re.findall( '(.*?):(.*?)(;|$)', rule[1] ):
-				key = prop[0].strip().lower()
-				if key not in porder:
-					porder.append( key )
-				properties[ key ] = prop[1].strip()
-			
-			# output rule if it contains any declarations
-			if properties:
-				min_css = min_css + "%s{%s}" % ( ','.join( selectors ), ''.join(['%s:%s;' % (key, properties[key]) for key in porder])[:-1] )
-		
-		return min_css
+
 		
 	
 	# -------------------------------------------------------------------------------
@@ -776,15 +713,7 @@ class ClientsideWindowHelper:
 		self.config_fields['nodejs'] = gtk.Entry()
 		self.config_fields['nodejs'].set_text(self._settings['nodejs'])
 		table.attach(self.config_fields['nodejs'], 3, 4, 1, 2 )
-				
-		php_label = gtk.Label()
-		php_label.set_markup("How do I call PHP?")
-		php_label.set_alignment(xalign=0.0, yalign=0.5)
-		table.attach(php_label, 2, 3, 2, 3 )
-		
-		self.config_fields['php'] = gtk.Entry()
-		self.config_fields['php'].set_text(self._settings['php'])
-		table.attach(self.config_fields['php'], 3, 4, 2, 3 )
+
 		
 		after_label = gtk.Label()
 		after_label.set_markup("What do I do after I Minify or Format your code?")
@@ -834,9 +763,6 @@ class ClientsideWindowHelper:
 			
 			# where is nodejs
 			self._settings['nodejs'] = self.config_fields['nodejs'].get_text()
-			
-			# where is php
-			self._settings['php'] = self.config_fields['php'].get_text()
 			
 			# what to do when format or minify
 			if self.config_fields['replace_contents_0'].get_active():
