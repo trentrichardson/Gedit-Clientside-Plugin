@@ -208,6 +208,8 @@ class CSSMin:
 			brace_new_line_str = '\n{\n'
 			
 		css = css.strip()
+		css = re.sub(r"[ ]+", " ", css)
+		css = re.sub(r";;+", ";", css)
 		
 		# Allow only one charset,.. at the very beginning
 		charset_re = "(@charset \"[^\"]*\";)"
