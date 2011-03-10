@@ -222,7 +222,8 @@ class CSSMin:
 		css = re.sub(r'((\s|\n)*\{(\s|\n)*)', brace_new_line_str, css) #remove spaces before and after {
 		css = re.sub(r'((\s|\n)*\}(\s|\n)*)','\n}\n', css) #remove spaces before and after }
 		css = re.sub(r'((\s|\n)*(;)+(\s|\n)*)', ';\n', css) #clean up ;
-		
+		css = re.sub(r'(\}(\s)*\n(\s|\n)*(\/\*))', '}\n\n/*', css) #add an extra line above comments after }
+		css = re.sub(charset_re, r'\1\n', css) #add an extra line after charset
 		
 		#correctly indent (with proper tabs)
 		lines = css.splitlines()
