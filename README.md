@@ -29,8 +29,8 @@ javascript and css. Tools for javascript include:
 
 Tools for CSS:
 
-- [CSSTidy](http://csstidy.sourceforge.net/) to format and clean
-- CSS Minification (also CSSTidy)
+- CSS Format and clean
+- CSS Minification (Similar routine as YUICompressor)
 
 Author: [Trent Richardson](http://trentrichardson.com)
 
@@ -45,7 +45,6 @@ For Ubuntu use:
 For other linux distrobutions this may be a click away in your package manager. 
 The plugin uses nodejs to execute serverside javascript (jslint and jsbeautify)
 
-PHP for running PHP version of CSSTidy
 
 INSTALL
 -------
