@@ -106,7 +106,7 @@ class ClientsideWindowHelper:
 			("ClientsideJSFormat", None, _("Format JS"), None, _("Format JS"), self.on_format_js_activate),
 			("ClientsideJSMinify", None, _("Minify JS"), "<Ctrl>U", _("Minify JS"), self.on_minifier_js_activate),
 			("ClientsideJSBatchMinify", None, _("Batch Minify JS"), None, _("Batch Minify JS"), self.on_batch_minifier_js_activate),
-			("ClientsideJSLint", None, _("JSLint"), None, _("JSLint"), self.on_lint_js_activate),
+			("ClientsideJSLint", None, _("JSLint"), "<ALT>U", _("JSLint"), self.on_lint_js_activate),
 			("ClientsideCSSFormat", None, _("Format CSS"), None, _("Format and Clean CSS"), self.on_format_css_activate),
 			("ClientsideCSSMinify", None, _("Minify CSS"), "<Ctrl><Shift>U", _("Minify CSS"), self.on_minifier_css_activate),
 			("ClientsideCSSBatchMinify", None, _("Batch Minify CSS"), None, _("Batch Minify CSS"), self.on_batch_minifier_css_activate),
