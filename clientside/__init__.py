@@ -41,6 +41,7 @@ ui_str = """
 					<menuitem name="ClientsideCSSFormat" action="ClientsideCSSFormat"/>
 					<menuitem name="ClientsideCSSMinify" action="ClientsideCSSMinify"/>
 					<menuitem name="ClientsideCSSBatchMinify" action="ClientsideCSSBatchMinify"/>
+					<menuitem name="ClientsideCSSLint" action="ClientsideCSSLint"/>
 					<separator />
 					<menuitem name="ClientsideGzip" action="ClientsideGzip"/>
 					<separator />
@@ -75,8 +76,6 @@ class ClientsideWindowHelper:
 			'keep_array_indentation': 'true',
 			'space_after_anon_function': 'true',
 			'decompress': 'true',
-			'csstidy_minify': 'highest_compression',
-			'csstidy_beautify': 'low_compression',
 		}
 		
 		self._insert_menu()
@@ -110,6 +109,7 @@ class ClientsideWindowHelper:
 			("ClientsideCSSFormat", None, _("Format CSS"), None, _("Format and Clean CSS"), self.on_format_css_activate),
 			("ClientsideCSSMinify", None, _("Minify CSS"), "<Ctrl><Shift>U", _("Minify CSS"), self.on_minifier_css_activate),
 			("ClientsideCSSBatchMinify", None, _("Batch Minify CSS"), None, _("Batch Minify CSS"), self.on_batch_minifier_css_activate),
+			("ClientsideCSSLint", None, _("CSSLint"), "<ALT><Shift>U", _("CSSLint"), self.on_lint_css_activate),
 			("ClientsideGzip", None, _("Gzip Current File"), "<Ctrl><Alt>U", _("Gzip Current File"), self.on_minifier_gzip_activate),
 			("ClientsideConfig", None, _("Configure Plugin"),None, _("Configure Plugin"),self.open_config_window),
 		])
@@ -347,7 +347,73 @@ class ClientsideWindowHelper:
 
 		return	
 
-
+	# -------------------------------------------------------------------------------
+	# css lint button click
+	def on_lint_css_activate(self, action):
+		doc = self._window.get_active_document()
+		self.tab = self._window.get_active_tab()
+		if not doc:
+			return
+		
+		csslint_path = os.path.join(self.plugin_dir, "csslint-node")
+		tmpfile_path = os.path.join(self.plugin_dir, "tmp_csslint.js")
+		tmpcode_path = os.path.join(self.plugin_dir, "tmp_csslint_code.js")
+		
+		tmpfile = open(tmpfile_path,"w")
+		tmpfile.writelines("var sys = require('sys');")
+		tmpfile.writelines("var fs = require('fs');")
+		tmpfile.writelines("var CSSLint = require('" + csslint_path + "').CSSLint;")
+		tmpfile.writelines("var body = fs.readFileSync('" + tmpcode_path + "');")
+		tmpfile.write('''
+			body = body.toString("utf8");
+			var result = CSSLint.verify(body);
+			var msgs = result.messages;
+			var errors = [];
+			var out = '';
+			
+			if(msgs){
+				for(var i=0, len=msgs.length; i<len; i++){
+					out += msgs[i].line +','+ msgs[i].col +',"'+ msgs[i].type +': '+ msgs[i].message.toString().replace('"','\"') +'"\\n';
+					errors.push('{"message":"' + msgs[i].type +': '+ msgs[i].reason + '", "line":' + msgs[i].line + ', "col":' + msgs[i].col + '}');
+				}
+			}
+			
+			process.stdout.write(out);
+		''')
+		tmpfile.close()
+		
+		# store in tmp file
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		tmpcode = open(tmpcode_path,"w")
+		tmpcode.write(doctxt)
+		tmpcode.close()
+		
+		# run validation
+		result = self._get_cmd_output(self._settings['nodejs'] +' ' + tmpfile_path)
+		
+		#clean up
+		os.remove(tmpcode_path)
+		os.remove(tmpfile_path)
+		
+		# we need to format it for our populate routine
+		csslint_results = result.splitlines()
+		elist = []
+		for e in csslint_results:
+			tmpparts = e.split(',')#re.split(r'\s*("[^"]*"|.*?)\s*,',e)
+			if len(tmpparts) > 0:
+				tmperr = { 
+					'line': int(tmpparts[0]), 
+					'char': int(tmpparts[1]), 
+					'text': tmpparts[2] 
+				}
+				tmperr['text'] = re.sub(r'^\"','', tmperr['text'])
+				tmperr['text'] = re.sub(r'\"$','', tmperr['text'])
+				elist.append( tmperr )
+		
+		self.create_bottom_tab()
+		self.populate_bottom_tab(elist)
+	
+	
 	# -------------------------------------------------------------------------------
 	# css format button click
 	def on_format_css_activate(self, action):
