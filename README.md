@@ -31,6 +31,7 @@ Tools for CSS:
 
 - CSS Format and clean
 - CSS Minification (Similar routine as YUICompressor)
+- [CSSLint](https://github.com/stubbornella/csslint) to look for syntax issues and errors
 
 Author: [Trent Richardson](http://trentrichardson.com)
 
