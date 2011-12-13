@@ -19,8 +19,7 @@ from StringIO import StringIO
 from jsmin import JavascriptMinify
 from cssmin import CSSMin
 
-import gtk
-import gedit
+from gi.repository import GObject, Gtk, Gdk, Gedit, PeasGtk
 import os
 import re
 import gzip
@@ -60,7 +59,8 @@ class ClientsideWindowHelper:
 		self.tab = None
 		self.pane = None
 		
-		self.clipboard = gtk.Clipboard(gtk.gdk.display_get_default(), "CLIPBOARD")
+		atom = Gdk.atom_intern('CLIPBOARD', True)
+		self.clipboard = Gtk.Clipboard.get(atom)
 		
 		self.plugin_dir = os.path.split(__file__)[0]
 		self.config_store = os.path.join(self.plugin_dir, "defaults.pkl")
@@ -99,7 +99,7 @@ class ClientsideWindowHelper:
 		manager = self._window.get_ui_manager()
 		
 		# Create a new action group
-		self._action_group = gtk.ActionGroup("ClientsidePluginActions")
+		self._action_group = Gtk.ActionGroup("ClientsidePluginActions")
 		self._action_group.add_actions([
 			("ClientsideMenuAction", None, _("Clientside"), None, _("Clientside Tools : For JS and CSS"), None),
 			("ClientsideJSFormat", None, _("Format JS"), None, _("Format JS"), self.on_format_js_activate),
@@ -116,6 +116,7 @@ class ClientsideWindowHelper:
 		
 		manager.insert_action_group(self._action_group, -1)
 		self._ui_id = manager.add_ui_from_string(ui_str)
+		manager.ensure_update()
 
 	def _remove_menu(self):        
 		manager = self._window.get_ui_manager()
@@ -177,7 +178,7 @@ class ClientsideWindowHelper:
 	
 	# -------------------------------------------------------------------------------
 	def row_clicked(self, treeview, path, view_column, doc):
-		lineno, charno = self.lines[path[0]]
+		lineno, charno = self.lines[path.get_indices()[0]]
 		view = self._window.get_active_view()
 		
 		doc.goto_line(lineno)
@@ -207,21 +208,30 @@ class ClientsideWindowHelper:
 			return
 		
 		if not self.pane:
-			self.errorlines = gtk.ListStore(int,int,str)
-			self.pane = gtk.ScrolledWindow()
-			treeview = gtk.TreeView(model=self.errorlines)
+			self.errorlines = Gtk.ListStore(int,int,str)
+			self.pane = Gtk.ScrolledWindow()
+			treeview = Gtk.TreeView(model=self.errorlines)
 			
-			lineno = gtk.TreeViewColumn('Line')
-			charno = gtk.TreeViewColumn('Char')
-			message = gtk.TreeViewColumn('Message')
+			lineno = Gtk.TreeViewColumn('Line', Gtk.CellRendererText(), text=0)
+			charno = Gtk.TreeViewColumn('Char', Gtk.CellRendererText(), text=1)
+			message = Gtk.TreeViewColumn('Message', Gtk.CellRendererText(), text=2)
 			
 			treeview.append_column(lineno)
 			treeview.append_column(charno)
 			treeview.append_column(message)
 			
-			cell1 = gtk.CellRendererText()
-			cell2 = gtk.CellRendererText()
-			cell3 = gtk.CellRendererText()
+			"""
+			lineno = Gtk.TreeViewColumn('Line')
+			charno = Gtk.TreeViewColumn('Char')
+			message = Gtk.TreeViewColumn('Message')
+			
+			treeview.append_column(lineno)
+			treeview.append_column(charno)
+			treeview.append_column(message)
+			
+			cell1 = Gtk.CellRendererText()
+			cell2 = Gtk.CellRendererText()
+			cell3 = Gtk.CellRendererText()
 			
 			lineno.pack_start(cell1,True)
 			charno.pack_start(cell2, True)
@@ -230,12 +240,12 @@ class ClientsideWindowHelper:
 			lineno.set_attributes(cell1, text=0)
 			charno.set_attributes(cell2, text=1)
 			message.set_attributes(cell3, text=2)
-			
+			"""
 			bottom = self._window.get_bottom_panel()
-			image = gtk.Image()
-			image.set_from_icon_name('gtk-dialog-warning', gtk.ICON_SIZE_MENU)
+			image = Gtk.Image()
+			image.set_from_icon_name('gtk-dialog-warning', Gtk.IconSize.MENU)
 			self.pane.add(treeview)
-			bottom.add_item(self.pane, 'Clientside Issues', image)
+			bottom.add_item(self.pane, 'ClientsideIssues', 'Clientside Issues', image)
 			treeview.connect("row-activated", self.row_clicked, doc)
 			self.pane.show_all()
 			
@@ -281,7 +291,7 @@ class ClientsideWindowHelper:
 		tmpfile.close()
 		
 		# store in tmp file
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter(), True)
 		tmpcode = open(tmpcode_path,"w")
 		tmpcode.write(doctxt)
 		tmpcode.close()
@@ -319,7 +329,7 @@ class ClientsideWindowHelper:
 		if not doc:
 			return
 		
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter(), True)
 		formatted_js = self.get_formatted_js_str(doctxt)
 		
 		#print result
@@ -333,7 +343,7 @@ class ClientsideWindowHelper:
 		if not doc:
 			return
 			
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter(), True)
 		min_js = self.get_minified_js_str(doctxt)
 		
 		self.handle_new_output("Minified JS Copied to CLipboard", min_js)	
@@ -383,7 +393,7 @@ class ClientsideWindowHelper:
 		tmpfile.close()
 		
 		# store in tmp file
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter(), True)
 		tmpcode = open(tmpcode_path,"w")
 		tmpcode.write(doctxt)
 		tmpcode.close()
@@ -421,7 +431,7 @@ class ClientsideWindowHelper:
 		if not doc:
 			return
 		
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter(), True)
 		formatted_css = self.get_formatted_css_str(doctxt)
         
 		self.handle_new_output("Formatted CSS Copied to Clipboard.", formatted_css)
@@ -434,7 +444,7 @@ class ClientsideWindowHelper:
 		if not doc:
 			return
 			
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter(), True)
 		min_css = self.get_minified_css_str(doctxt)
 		
 		self.handle_new_output("Minified CSS Copied to Clipboard.", min_css)
@@ -458,18 +468,18 @@ class ClientsideWindowHelper:
 		
 		docuri = doc.get_uri_for_display()
 		docfilename = doc.get_short_name_for_display()
-		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter())
+		doctxt = doc.get_text(doc.get_iter_at_line(0), doc.get_end_iter(), True)
 		docfilenamegz = docfilename + '.gz'
 		
-		dialog = gtk.FileChooserDialog(title=None,action=gtk.FILE_CHOOSER_ACTION_SAVE,buttons=(gtk.STOCK_CANCEL,gtk.RESPONSE_CANCEL,gtk.STOCK_SAVE,gtk.RESPONSE_OK))
+		dialog = Gtk.FileChooserDialog(title=None,action=Gtk.FileChooserAction.SAVE,buttons=(Gtk.STOCK_CANCEL,Gtk.ResponseType.CANCEL,Gtk.STOCK_SAVE,Gtk.ResponseType.OK))
 		dialog.set_do_overwrite_confirmation(True)
 		dialog.set_current_folder(os.path.split(docuri)[0])
 		dialog.set_current_name(docfilenamegz)
-		dialog.set_default_response(gtk.RESPONSE_OK)
+		dialog.set_default_response(Gtk.ResponseType.OK)
        
 		response = dialog.run()
 		
-		if response == gtk.RESPONSE_OK:
+		if response == Gtk.ResponseType.OK:
 			newgzuri = dialog.get_filename()
 			
 			f = gzip.open(newgzuri, 'wb')
@@ -563,56 +573,56 @@ class ClientsideWindowHelper:
 	# choose files, minify them, and return a string
 	def get_batch_minify_files_str(self, filter_name, filter_type):
 		
-		app_inst = gedit.app_get_default()
+		app_inst = Gedit.App.get_default()
 		active_window = app_inst.get_active_window()
 		
-		dialog = gtk.Dialog("Select Files to Minify", active_window, 0, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+		dialog = Gtk.Dialog("Select Files to Minify", active_window, 0, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK))
 		dialog.set_default_size(400, -1)
 		content_area = dialog.get_content_area()
 		
-		treestore = gtk.TreeStore(str,str)
-		treeview = gtk.TreeView(treestore)
+		treestore = Gtk.TreeStore(str,str)
+		treeview = Gtk.TreeView(treestore)
 		treeview.set_size_request(400, 150)
 		
 		#column 1
-		cell = gtk.CellRendererText()
-		col = gtk.TreeViewColumn("File", cell, text=0)
+		cell = Gtk.CellRendererText()
+		col = Gtk.TreeViewColumn("File", cell, text=0)
 		treeview.append_column(col)
 		
 		#column 2
-		cell = gtk.CellRendererText()
-		col = gtk.TreeViewColumn("Path", cell, text=1)
+		cell = Gtk.CellRendererText()
+		col = Gtk.TreeViewColumn("Path", cell, text=1)
 		treeview.append_column(col)
 
 		self.treeview_setup_dnd(treeview)
 
 		content_area.pack_start(treeview, expand=False, fill=False, padding=0)
 		
-		hb = gtk.HBox(False)
+		hb = Gtk.HBox(False)
 		
 		#add button
-		img = gtk.Image()
-		img.set_from_stock(gtk.STOCK_ADD, gtk.ICON_SIZE_SMALL_TOOLBAR)
-		btn_add = gtk.Button()
+		img = Gtk.Image()
+		img.set_from_stock(Gtk.STOCK_ADD, Gtk.IconSize.SMALL_TOOLBAR)
+		btn_add = Gtk.Button()
 		btn_add.set_image(img)
 		#btn_add = gtk.Button(label="+")
 		#btn_add.set_size_request(20, 20)
 		btn_add.connect('clicked', self.treeview_add_clicked, treeview, filter_name, filter_type)
-		vb = gtk.VBox()
-		vb.pack_start(btn_add, False)
-		hb.pack_start(vb, False)
+		vb = Gtk.VBox()
+		vb.pack_start(btn_add, expand=False, fill=False, padding=0)
+		hb.pack_start(vb, expand=False, fill=False, padding=0)
 		
 		#remove button
-		img = gtk.Image()
-		img.set_from_stock(gtk.STOCK_REMOVE, gtk.ICON_SIZE_SMALL_TOOLBAR)
-		btn_remove = gtk.Button()
+		img = Gtk.Image()
+		img.set_from_stock(Gtk.STOCK_REMOVE, Gtk.IconSize.SMALL_TOOLBAR)
+		btn_remove = Gtk.Button()
 		btn_remove.set_image(img)
-		#btn_remove = gtk.Button(label="-")
+		#btn_remove = Gtk.Button(label="-")
 		#btn_remove.set_size_request(20, 20)
 		btn_remove.connect('clicked', self.treeview_remove_clicked, treeview)
-		vb = gtk.VBox()
-		vb.pack_start(btn_remove)
-		hb.pack_start(vb, False)
+		vb = Gtk.VBox()
+		vb.pack_start(btn_remove, expand=False, fill=False, padding=0)
+		hb.pack_start(vb, expand=False, fill=False, padding=0)
 		
 		content_area.pack_start(hb, expand=False, fill=False, padding=0)
 		
@@ -624,7 +634,7 @@ class ClientsideWindowHelper:
 		response = dialog.run()
 		
 		
-		if response == gtk.RESPONSE_OK:
+		if response == Gtk.ResponseType.OK:
 			model = treeview.get_model()
 			filenames = []
 			
@@ -667,18 +677,18 @@ class ClientsideWindowHelper:
 	def treeview_add_clicked(self, button, treeview, filter_name, filter_type):
 		model = treeview.get_model()
 		
-		dialog = gtk.FileChooserDialog("Choose "+filter_name, None, gtk.FILE_CHOOSER_ACTION_OPEN, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-		dialog.set_default_response(gtk.RESPONSE_OK)
+		dialog = Gtk.FileChooserDialog("Choose "+filter_name, None, Gtk.FileChooserAction.OPEN, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
+		dialog.set_default_response(Gtk.ResponseType.OK)
 		dialog.set_select_multiple(True)
 		
-		filter = gtk.FileFilter()
+		filter = Gtk.FileFilter()
 		filter.set_name(filter_name)
 		filter.add_pattern("*."+ filter_type)
 		dialog.add_filter(filter)
 
 		response = dialog.run()
 		
-		if response == gtk.RESPONSE_OK:
+		if response == Gtk.ResponseType.OK:
 			filenames = dialog.get_filenames()
 			
 			if filenames:
@@ -695,20 +705,21 @@ class ClientsideWindowHelper:
 	
 	# handle treeview drag and drop
 	def treeview_setup_dnd(self, treeview):
-	    target_entries = [('example', gtk.TARGET_SAME_WIDGET, 0)]
-	    treeview.enable_model_drag_source(gtk.gdk.BUTTON1_MASK, target_entries, gtk.gdk.ACTION_MOVE)
-	    treeview.enable_model_drag_dest(target_entries, gtk.gdk.ACTION_MOVE)
-	    treeview.connect('drag-data-received', self.treeview_on_drag_data_received)
+		target_entries = [('example', Gtk.TargetFlags.SAME_WIDGET, 0)]
+		treeview.enable_model_drag_source(Gdk.ModifierType.BUTTON1_MASK, target_entries, Gdk.DragAction.MOVE)
+		treeview.enable_model_drag_dest(target_entries, Gdk.DragAction.MOVE)
+		treeview.connect('drag-data-received', self.treeview_on_drag_data_received)
 	    
 	def treeview_on_drag_data_received(self, treeview, drag_context, x, y, selection_data, info, eventtime):
+		print "found dnd"
 		target_path, drop_position = treeview.get_dest_row_at_pos(x, y)
 		model, source = treeview.get_selection().get_selected()
 		target = model.get_iter(target_path)
 		if not model.is_ancestor(source, target):
 			
-			if drop_position == gtk.TREE_VIEW_DROP_BEFORE:
+			if drop_position == Gtk.TREE_VIEW_DROP_BEFORE:
 				model.move_before(source, target)
-			elif drop_position == gtk.TREE_VIEW_DROP_AFTER:
+			elif drop_position == Gtk.TREE_VIEW_DROP_AFTER:
 				model.move_after(source, target)
 				
 			drag_context.finish(success=True, del_=False, time=eventtime)
@@ -726,22 +737,22 @@ class ClientsideWindowHelper:
 		remark = remark +"\n\nDo you want to replace it in the document?"
 		
 		#save to clipboard
-		self.clipboard.set_text(contents)
+		self.clipboard.set_text(contents, len(contents))
 		
 		# do we want to overwrite current document?
-		response = gtk.RESPONSE_NO
+		response = Gtk.ResponseType.NO
 		
 		# go ahead and replace it
 		if self._settings['replace_contents'] == 1:
-			response = gtk.RESPONSE_YES
-			
+			response = Gtk.ResponseType.YES
+		
 		# ask what to do	
 		elif self._settings['replace_contents'] == 2:
-			md = gtk.MessageDialog(type=gtk.MESSAGE_QUESTION, buttons=gtk.BUTTONS_YES_NO, flags=gtk.DIALOG_MODAL, message_format=remark)
+			md = Gtk.MessageDialog(self._window, Gtk.DialogFlags.MODAL | Gtk.DialogFlags.DESTROY_WITH_PARENT, Gtk.MessageType.QUESTION, Gtk.ButtonsType.YES_NO, remark)
 			response = md.run()
 			md.destroy()
 		
-		if response == gtk.RESPONSE_YES:
+		if response == Gtk.ResponseType.YES:
 			
 			# out with the old
 			view.select_all()
@@ -754,60 +765,66 @@ class ClientsideWindowHelper:
 	# Configuration Window
 	#================================================================================
 	def open_config_window(self, action=None):
-		app_inst = gedit.app_get_default()
+		app_inst = Gedit.App.get_default()
 		active_window = app_inst.get_active_window()
 		
-		dialog = gtk.Dialog("Configure Gedit Clientside Plugin", active_window, 0, (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+		dialog = Gtk.Dialog("Configure Gedit Clientside Plugin", active_window, 0, (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK))
 		dialog.set_default_size(300, -1)
 		dialog.connect('response', self._save_config)
 		content_area = dialog.get_content_area()
 
-		table = gtk.Table(5, 4, False)	
+		table = Gtk.Table(5, 4, False)	
 		table.set_row_spacings(8)	
 		table.set_col_spacings(10)
 		
-		core_label = gtk.Label()
+		core_label = Gtk.Label()
 		core_label.set_markup("<b>Core Settings</b>")
 		core_label.set_alignment(xalign=0.0, yalign=0.5)
 		table.attach(core_label, 1, 4, 0, 1 )
 		
-		nodejs_label = gtk.Label()
+		nodejs_label = Gtk.Label()
 		nodejs_label.set_markup("How do I call NodeJS?")
 		nodejs_label.set_alignment(xalign=0.0, yalign=0.5)
 		table.attach(nodejs_label, 2, 3, 1, 2 )
 		
-		self.config_fields['nodejs'] = gtk.Entry()
+		self.config_fields['nodejs'] = Gtk.Entry()
 		self.config_fields['nodejs'].set_text(self._settings['nodejs'])
 		table.attach(self.config_fields['nodejs'], 3, 4, 1, 2 )
 
 		
-		after_label = gtk.Label()
+		after_label = Gtk.Label()
 		after_label.set_markup("What do I do after I Minify or Format your code?")
 		after_label.set_alignment(xalign=0.0, yalign=0.5)
 		table.attach(after_label, 2, 4, 3, 4 )
 		
-		self.config_fields['replace_contents_0'] = gtk.RadioButton(None, "Copy to clipboard")
+		self.config_fields['replace_contents_0'] = Gtk.RadioButton.new_with_label_from_widget(None, "Copy to clipboard")
 		if self._settings['replace_contents'] == 0:
 			self.config_fields['replace_contents_0'].set_active(True)
+		else:
+			self.config_fields['replace_contents_0'].set_active(False)
 		table.attach(self.config_fields['replace_contents_0'], 2, 4, 4, 5 )
 		
-		self.config_fields['replace_contents_1'] = gtk.RadioButton(self.config_fields['replace_contents_0'], "Replace the current file")
+		self.config_fields['replace_contents_1'] = Gtk.RadioButton.new_with_label_from_widget(self.config_fields['replace_contents_0'], "Replace the current file")
 		if self._settings['replace_contents'] == 1:
 			self.config_fields['replace_contents_1'].set_active(True)
+		else:
+			self.config_fields['replace_contents_1'].set_active(False)
 		table.attach(self.config_fields['replace_contents_1'], 2, 4, 5, 6 )
 		
-		self.config_fields['replace_contents_2'] = gtk.RadioButton(self.config_fields['replace_contents_0'], "Ask me")
+		self.config_fields['replace_contents_2'] = Gtk.RadioButton.new_with_label_from_widget(self.config_fields['replace_contents_0'], "Ask me")
 		if self._settings['replace_contents'] == 2:
 			self.config_fields['replace_contents_2'].set_active(True)
+		else:
+			self.config_fields['replace_contents_2'].set_active(False)
 		table.attach(self.config_fields['replace_contents_2'], 2, 4, 6, 7 )
 
 		
-		formatting_label = gtk.Label()
+		formatting_label = Gtk.Label()
 		formatting_label.set_markup("<b>Formatting</b>")
 		formatting_label.set_alignment(xalign=0.0, yalign=0.5)
 		table.attach(formatting_label, 1, 4, 7, 8 )
 		
-		self.config_fields['braces_on_own_line'] = gtk.CheckButton("Place braces on a new line")
+		self.config_fields['braces_on_own_line'] = Gtk.CheckButton("Place braces on a new line")
 		if self._settings['braces_on_own_line'] == "true":
 			self.config_fields['braces_on_own_line'].set_active(True)
 		table.attach(self.config_fields['braces_on_own_line'], 2, 4, 8, 9 )
@@ -825,7 +842,7 @@ class ClientsideWindowHelper:
 		response_id = dialog.run()
 		
 	def _save_config(self, dialog, response_id):
-		if response_id == gtk.RESPONSE_OK:
+		if response_id == Gtk.ResponseType.OK:
 			
 			# where is nodejs
 			self._settings['nodejs'] = self.config_fields['nodejs'].get_text()
@@ -870,29 +887,26 @@ class ClientsideWindowHelper:
 		return	
 
 
-#================================================================================
-# Clientside Plugin Class
-#================================================================================
-class ClientsidePlugin(gedit.Plugin):
+class ClientsidePlugin(GObject.Object, Gedit.WindowActivatable, PeasGtk.Configurable):
+	__gtype_name__ = "ClientsidePlugin"
+	window = GObject.property(type=Gedit.Window)
+	
 	def __init__(self):
-		gedit.Plugin.__init__(self)
+		GObject.Object.__init__(self)
 		self._instances = {}
-	
-	def activate(self, window):
-		self._instances[window] =ClientsideWindowHelper(self, window)
-	
-	def deactivate(self, window):
-		self._instances[window].deactivate()
-		del self._instances[window]
-	
-	def update_ui(self, window):
-		self._instances[window].update_ui()
 		
-	def create_configure_dialog(self):
-		app_inst = gedit.app_get_default()
-		active_window = app_inst.get_active_window()
+	def do_activate(self):
+		self._instances[self.window] = ClientsideWindowHelper(self, self.window)
+
+	def do_deactivate(self):
+		self._instances[self.window].deactivate()
+		del self._instances[self.window]
+
+	def do_update_state(self):
+		self._instances[self.window].update_ui()
 		
-		return self._instances[active_window].open_config_window()
-	
-	def is_configurable(self):
-		return True
+	def do_create_configure_widget(self):
+		#return self._instances[self.window].open_config_window()
+		widget = Gtk.Label("Please update this plugin from the Tools->Clientside menu.")
+		return widget
+
