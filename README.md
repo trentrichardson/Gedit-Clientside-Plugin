@@ -1,7 +1,7 @@
 Gedit Clientside Plugin
 =======================
 
-ABOUT
+About
 -----
 
 - Author: [Trent Richardson](http://trentrichardson.com)
@@ -22,7 +22,7 @@ Tools for CSS:
 
 Author: [Trent Richardson](http://trentrichardson.com)
 
-PREREQUISITES
+Prerequisites
 -------------
 NodeJS: <http://nodejs.org/>
 
@@ -34,14 +34,14 @@ For other linux distrobutions this may be a click away in your package manager.
 The plugin uses nodejs to execute serverside javascript (jslint and jsbeautify)
 
 
-INSTALL
+Install
 -------
 
 - Copy the clientside directory and clientside.gedit-plugin file into your gedit plugins directory.
 - Start or restart gedit
 - Open the Preferences, and navigate to Plugins, check to enable Clientside plugin
 
-CONFIGURE
+Configure
 ---------
 Once you've installed the plugin you can configure it to your needs through the Gedit Plugins Tab and click Configure, or through the Tools->Clientside menu.
 
@@ -64,7 +64,7 @@ Unchecking the box will look like this:
 		// ...
 	}
 
-USE
+Use
 ---
 
 - With your js or css file the active document go to Tools -> Clientside -> desired tool
@@ -72,7 +72,7 @@ USE
 - With JSLint the bottom pane will have a new tab with any issues found
 - For Batch Minify click the + icon and choose your files.  Drag and drop them in the grid to reorder them.
 
-LICENSE
+License
 -------
 Copyright 2011 Trent Richardson
 
